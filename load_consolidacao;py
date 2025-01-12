@@ -1,0 +1,55 @@
+from pydrive.auth import GoogleAuth
+from pydrive.drive import GoogleDrive
+import pandas as pd
+
+def download_and_export_file(file_id, file_name, mime_type='text/csv'):
+    """Baixa um arquivo do Google Drive e o exporta no formato desejado."""
+    gauth = GoogleAuth()
+    gauth.LocalWebserverAuth()  # Realiza a autenticação local
+    drive = GoogleDrive(gauth)
+    
+    file = drive.CreateFile({'id': file_id})
+    file.FetchMetadata()  # Obtém informações sobre o arquivo
+
+    # Verifica se é uma Google Spreadsheet
+    if 'application/vnd.google-apps.spreadsheet' in file['mimeType']:
+        # Exporta a planilha como CSV
+        export_link = file['exportLinks'][f'application/{mime_type}']
+        file.GetContentFile(file_name, mimetype=f'application/{mime_type}')
+    else:
+        # Baixa o arquivo diretamente
+        file.GetContentFile(file_name)
+    
+    print(f"Arquivo {file_name} baixado com sucesso!")
+
+def consolidate_data():
+    # IDs dos arquivos no Google Drive
+    liquidacao_id = '1aOztWaK6N07CWHCO-73YjhwcgLlFvNHN3s02Nii1Zwg'
+    custas_id = '1cWMPOn27XkzhQ84uff2RxGyrkYc2-yeTPStOUf2Exf4'
+    
+    # Baixar e exportar os arquivos como CSV
+    download_and_export_file(liquidacao_id, 'liquidacao.csv', 'csv')
+    download_and_export_file(custas_id, 'custas.csv', 'csv')
+    
+    # Carregar os arquivos
+    liquidacao = pd.read_csv('liquidacao.csv')
+    custas = pd.read_csv('custas.csv')
+    
+    # Selecionar colunas específicas de liquidacao
+    liquidacao = liquidacao[['Núcleo', 'Posição Geral', 'Posição Prioridade',
+                             'Número do processo', 'Vara', 'Data Remessa Contadoria',
+                              'Prioridade',
+                             'Calculista', 'Data da atribuição', 'Cumprimento', 'Data da conclusão', 
+                             'Valor Total Devido - Custas', 'Observações']]
+    
+    # Mesclar liquidacao e custas
+    consolidacao = pd.concat([liquidacao, custas], axis=0, ignore_index=True)
+    
+    # Salvar arquivo consolidado
+    consolidacao.to_csv('consolidacao.csv', index=False, encoding='utf-8')
+    consolidacao.to_excel('consolidacao.xlsx', sheet_name='consolidacao', index=False)
+    print("Consolidação concluída e arquivos salvos.")
+    return consolidacao
+
+# Executar o processo
+consolidacao = consolidate_data()
